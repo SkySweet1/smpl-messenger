@@ -11,15 +11,15 @@
 #define BUFFER_SIZE 1024
 #define MAX_CLIENTS 2
 
-void set_rgb_color(int r, int g, int b) {
+void set_rgb_color(int r, int g, int b){
     printf("\033[38;2;%d;%d;%dm", r, g, b);
 }
 
-void rainbow_text_smooth(const char* text) {
+void rainbow_text_smooth(const char* text){
     int length = 0;
     while(text[length] != '\0') length++;
     
-    for(int i = 0; i < length; i++) {
+    for(int i = 0; i < length; i++){
         float position = (float)i / length;
         
         int r = (int)(sin(position * 2 * M_PI + 0) * 127 + 128);
@@ -79,10 +79,10 @@ int main(void){
         
         select(max_fd + 1, &readfds, NULL, NULL, NULL);
 
-        if(FD_ISSET(client_sockets[0], &readfds)) {
+        if(FD_ISSET(client_sockets[0], &readfds)){
             int bytes_read = recv(client_sockets[0], buffer, sizeof(buffer), 0);
 
-            if(bytes_read > 0) {
+            if(bytes_read > 0){
                 buffer[bytes_read] = '\0';
 
                 printf("\033[90mClient 1: %s\033[0m", buffer);
@@ -91,10 +91,10 @@ int main(void){
             }
         }
 
-        if(FD_ISSET(client_sockets[1], &readfds)) {
+        if(FD_ISSET(client_sockets[1], &readfds)){
             int bytes_read = recv(client_sockets[1], buffer, sizeof(buffer), 0);
 
-            if(bytes_read > 0) {
+            if(bytes_read > 0){
                 buffer[bytes_read] = '\0';
 
                 printf("\033[90mClient 2: %s\033[0m", buffer);
