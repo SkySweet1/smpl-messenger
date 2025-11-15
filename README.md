@@ -13,3 +13,11 @@ gcc -o serv serv.c -lm
 ./serv    # Terminal 1
 ./clie    # Terminal 2
 ```
+
+## launch via the internet (Tailscale)
+if u want your friends to be able to connect from any network:
+```bash
+# 1. install Tailscale: https://tailscale.com
+# 2. in the client, replace 127.0.0.1 with the Tailscale server IP.
+# 3. start the server and share your Tailscale IP with your friends.
+```
