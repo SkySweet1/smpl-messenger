@@ -1,9 +1,15 @@
-#rainbow messenger
+# simpl-messenger
 
 simmple messenger with small bug)
 
-## compilation
+## compilation:
 ```bash
-gcc -o client client.c -lm
-gcc -o server server.c -lm
+gcc -o clie clie.c -lm
+gcc -o serv serv.c -lm
+```
+
+## launch:
+```bash
+./serv    # Terminal 1
+./clie    # Terminal 2
 ```
