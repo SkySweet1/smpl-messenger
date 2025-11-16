@@ -69,7 +69,7 @@ int main(void){
 
     rainbow_text_smooth("----------------------------\n");
 
-    while(1) {
+    while(1){
         fd_set readfds;
         FD_ZERO(&readfds);
         FD_SET(client_sockets[0], &readfds);
