@@ -10,11 +10,11 @@
 #define PORT 0002
 #define BUFFER_SIZE 1024
 
-void set_rgb_color(int r, int g, int b) {
+void set_rgb_color(int r, int g, int b){
     printf("\033[38;2;%d;%d;%dm", r, g, b);
 }
 
-void rainbow_text_smooth(const char* text) {
+void rainbow_text_smooth(const char* text){
     int length = 0;
     while(text[length] != '\0') length++;
     
