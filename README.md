@@ -16,7 +16,7 @@ gcc -o serv serv.c -lm
 ```
 
 ## launch via the internet (Tailscale)
-if u want your friends to be able to connect from any network:
+if u want your friend to be able to connect from any network:
 ```bash
 # 1. install Tailscale: https://tailscale.com
 # 2. in the client, replace 127.0.0.1 with the Tailscale server IP
