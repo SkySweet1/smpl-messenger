@@ -18,7 +18,7 @@ void rainbow_text_smooth(const char* text){
     int length = 0;
     while(text[length] != '\0') length++;
     
-    for(int i = 0; i < length; i++) {
+    for(int i = 0; i < length; i++){
         float position = (float)i / length;
         
         int r = (int)(sin(position * 2 * M_PI + 0) * 127 + 128);
