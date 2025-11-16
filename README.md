@@ -12,6 +12,7 @@ gcc -o serv serv.c -lm
 ```bash
 ./serv    # Terminal 1
 ./clie    # Terminal 2
+./clie    # Terminal 3 or anoher computer's terminal 1
 ```
 
 ## launch via the internet (Tailscale)
