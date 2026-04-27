@@ -14,6 +14,9 @@
 void set_rgb_color(int r, int g, int b){
     printf("\033[38;2;%d;%d;%dm", r, g, b);
 }
+/*
+функция установки цвета
+*/
 
 void rainbow_text_smooth(const char* text){
     int length = 0;
@@ -31,6 +34,11 @@ void rainbow_text_smooth(const char* text){
     }
     printf("\033[0m"); 
 }
+/*
+функция радужного вывода текста
+радужный текст — функция rainbow_text_smooth() использует синусоиды для плавного перехода цветов RGB
+каждый символ имеет свой цвет в зависимости от позиции в строке
+*/
 
 int main(void){
     int server_fd, new_socket;
@@ -43,20 +51,33 @@ int main(void){
         perror("invalid socket\n");
         exit(EXIT_FAILURE);
     }
-
+    /*
+    создание сокета
+    */
+    
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = INADDR_ANY;
     address.sin_port = htons(PORT);
+    /*
+    настройка адреса
+    */
+
 
     if(bind(server_fd, (struct sockaddr*)&address, sizeof(address)) < 0){
         perror("bind invalid\n");
         exit(EXIT_FAILURE);
     }
+    /*
+    биндинг
+    */
 
     if(listen(server_fd, 3) < 0){
         perror("listen invalid\n");
         exit(EXIT_FAILURE);
     }
+    /*
+    прослушивание
+    */
 
     rainbow_text_smooth("so far so good, it seems...\n");
 
@@ -66,18 +87,21 @@ int main(void){
         client_sockets[i] = accept(server_fd, (struct sockaddr*)&address, (socklen_t*)&addren);
         printf("\033[90mclie %d connect\033[0m\n", i+1);
     }
+    /*
+    прием двух клиентов
+    */
 
     rainbow_text_smooth("----------------------------\n");
 
     while(1){
-        fd_set readfds;
-        FD_ZERO(&readfds);
-        FD_SET(client_sockets[0], &readfds);
-        FD_SET(client_sockets[1], &readfds);
+        fd_set readfds; // набор файловых дексрипторов
+        FD_ZERO(&readfds); // обнуление набора
+        FD_SET(client_sockets[0], &readfds); // добавить сокет первого клиента
+        FD_SET(client_sockets[1], &readfds); // добавить сокет второго клиента
         
-        int max_fd = (client_sockets[0] > client_sockets[1]) ? client_sockets[0] : client_sockets[1];
+        int max_fd = (client_sockets[0] > client_sockets[1]) ? client_sockets[0] : client_sockets[1]; // определение максимального fd нужно для select
         
-        select(max_fd + 1, &readfds, NULL, NULL, NULL);
+        select(max_fd + 1, &readfds, NULL, NULL, NULL); // select ждет активности на любом сокете
 
         if(FD_ISSET(client_sockets[0], &readfds)){
             int bytes_read = recv(client_sockets[0], buffer, sizeof(buffer), 0);
@@ -90,6 +114,9 @@ int main(void){
                 send(client_sockets[1], buffer, bytes_read, 0);
             }
         }
+        /*
+        проверка - пришли ла данные от первого клиента
+        */
 
         if(FD_ISSET(client_sockets[1], &readfds)){
             int bytes_read = recv(client_sockets[1], buffer, sizeof(buffer), 0);
@@ -101,10 +128,16 @@ int main(void){
                 send(client_sockets[0], buffer, bytes_read, 0);
             }
         }
+        /*
+        проверка - пришли ла данные от второго клиента
+        */
     }
 
     close(server_fd);
     close(new_socket);
+    /*
+    закрываем соединение
+    */
 
     return 0;
 }
