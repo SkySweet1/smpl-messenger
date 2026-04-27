@@ -102,6 +102,6 @@ int main(void){
         }                
     }
 
-    close(client_fd);
+    close(client_fd); // закрытие соединения
     return 0;
 }
