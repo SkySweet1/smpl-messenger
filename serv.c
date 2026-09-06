@@ -108,9 +108,12 @@ int main(void){
         FD_SET(client_sockets[0], &readfds);            // добавить сокет первого клиента
         FD_SET(client_sockets[1], &readfds);            // добавить сокет второго клиента
         
-        int max_fd = (client_sockets[0] > client_sockets[1]) ? client_sockets[0] : client_sockets[1]; // определение максимального fd нужно для select
-        
-        select(max_fd + 1, &readfds, NULL, NULL, NULL); // select ждет активности на любом сокете
+        int max_fd = (client_sockets[0] > client_sockets[1]) ? client_sockets[0] : client_sockets[1];
+        select(max_fd + 1, &readfds, NULL, NULL, NULL);
+        /*
+        определение максимального fd нужно для select
+        select ждет активности на любом сокете
+        */
 
         if(FD_ISSET(client_sockets[0], &readfds)){
         /*
