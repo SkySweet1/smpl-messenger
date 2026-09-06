@@ -494,7 +494,22 @@ void encrypt_message(const char *msg, u8 *encrypted, size_t *enc_len){
 */
 
 void decrypt_message(const u8 *encrypted, size_t enc_len, char *decrypted){
+    u8 temp[1024];
 
+    for(size_t i = 0; i < enc_len; i += 16){
+        kuznechik_decrypt(encrypted + i, temp + i);
+    }
+
+    size_t pad_len = temp[enc_len - 1];
+
+    if(pad_len > 0 && pad_len <= 16 && pad_len < enc_len){
+        memccpy(decrypted, temp, 0, enc_len - pad_len);
+        decrypted[enc_len - pad_len] = '\0';
+
+    } else {
+        memccpy(decrypted, temp, 0, enc_len);
+        decrypted[enc_len] = '\0';
+    }
 }
 /*
 
@@ -530,6 +545,15 @@ void rainbow_text_smooth(const char* text){ // радужный вывод
 */
 
 int main(void){
+    // инициализация Кузнечика с мастер-ключом (32 байта)
+    u8 master_key[32] = {
+        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+        0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
+        0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+        0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F
+    };
+    kuznechik_init(master_key);
+
     int client_fd;
     struct sockaddr_in server_addr;
     char buffer[BUFFER_SIZE] = {0};
@@ -560,7 +584,7 @@ int main(void){
 
     rainbow_text_smooth("connect\n");
 
-    while(1){ // бесконечный цикл
+    while(1){
         fd_set readfds;
         FD_ZERO(&readfds);
         FD_SET(client_fd, &readfds);
@@ -568,27 +592,53 @@ int main(void){
 
         select(client_fd + 1, &readfds, NULL, NULL, NULL); // select ждёт ввода с клавиатуры ИЛИ сообщения от сервера
 
-        if(FD_ISSET(0, &readfds)){ // проверяем, ввёл ли пользователь сообщение
+        if(FD_ISSET(0, &readfds)){
+        /*
+        проверяем, ввёл ли пользователь сообщение        
+        */
             fgets(buffer, BUFFER_SIZE, stdin);
-            send(client_fd, buffer, strlen(buffer), 0);
+            buffer[strcspn(buffer, "\n")] = 0;
+
+            u8 encrypted[BUFFER_SIZE];
+            size_t enc_len;
+            encrypt_message(buffer, encrypted, &enc_len);
+
+            uint32_t msg_len = htonl(enc_len);
+            send(client_fd, &msg_len, 4, 0);
+            send(client_fd, encrypted, enc_len, 0);
         }
 
-        if(FD_ISSET(client_fd, &readfds)){ // проверяем, пришло ли сообщение от сервера
-            int bytes_received = recv(client_fd, buffer, BUFFER_SIZE, 0);
+        if(FD_ISSET(client_fd, &readfds)){ 
+        /*
+        проверяем, пришло ли сообщение от сервера
+        */
+            uint32_t msg_len_net;
+            int bytes = recv(client_fd, &msg_len_net, 4, 0);
 
-            if(bytes_received > 0){
-                buffer[bytes_received] = '\0';
-                printf("\033[92m%s\033[0m", buffer);
-
-            } else if(bytes_received == 0){
-                rainbow_text_smooth("no connect -> server disconnected\n");
+            if(bytes <= 0){
+                rainbow_text_smooth("server disconnected\n");
                 break;
-
-            } else {
-                rainbow_text_smooth("connection error\n");
-                break;
-
             }
+
+            size_t enc_len = ntohl(msg_len_net);
+
+            if(enc_len > BUFFER_SIZE){
+                enc_len = BUFFER_SIZE;
+            }
+
+            u8 encrypted[BUFFER_SIZE];
+            bytes = recv(client_fd, encrypted, enc_len, 0);
+
+            if(bytes <= 0){
+                rainbow_text_smooth("server disconnected\n");
+                break;
+            }
+
+            char decrypted[BUFFER_SIZE];
+            decrypt_message(encrypted, enc_len, decrypted);
+
+            rainbow_text_smooth(decrypted);
+            printf("\n");
         }                
     }
 
