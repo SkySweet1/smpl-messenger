@@ -6,10 +6,13 @@
 #include <netinet/in.h>
 #include <math.h>
 #include <sys/select.h>
+#include <arpa/inet.h>  
 
 #define PORT 0002
 #define BUFFER_SIZE 1024
 #define MAX_CLIENTS 2
+
+typedef unsigned char u8;
 
 void set_rgb_color(int r, int g, int b){
     printf("\033[38;2;%d;%d;%dm", r, g, b);
@@ -41,7 +44,7 @@ void rainbow_text_smooth(const char* text){
 */
 
 int main(void){
-    int server_fd, new_socket;
+    int server_fd;
     int client_sockets[MAX_CLIENTS];
     struct sockaddr_in address;
     int addren = sizeof(address);
@@ -86,6 +89,12 @@ int main(void){
     for(int i = 0; i < MAX_CLIENTS; i++){
         client_sockets[i] = accept(server_fd, (struct sockaddr*)&address, (socklen_t*)&addren);
         printf("\033[90mclie %d connect\033[0m\n", i+1);
+
+        char welcome[] = "welcome to encrypted chat!";
+        uint32_t len_net = htonl(strlen(welcome));
+        
+        send(client_sockets[i], &len_net, 4, 0);
+        send(client_sockets[i], welcome, strlen(welcome), 0);
     }
     /*
     прием двух клиентов
@@ -94,47 +103,147 @@ int main(void){
     rainbow_text_smooth("----------------------------\n");
 
     while(1){
-        fd_set readfds; // набор файловых дексрипторов
-        FD_ZERO(&readfds); // обнуление набора
-        FD_SET(client_sockets[0], &readfds); // добавить сокет первого клиента
-        FD_SET(client_sockets[1], &readfds); // добавить сокет второго клиента
+        fd_set readfds;                                 // набор файловых дексрипторов
+        FD_ZERO(&readfds);                              // обнуление набора
+        FD_SET(client_sockets[0], &readfds);            // добавить сокет первого клиента
+        FD_SET(client_sockets[1], &readfds);            // добавить сокет второго клиента
         
         int max_fd = (client_sockets[0] > client_sockets[1]) ? client_sockets[0] : client_sockets[1]; // определение максимального fd нужно для select
         
         select(max_fd + 1, &readfds, NULL, NULL, NULL); // select ждет активности на любом сокете
 
         if(FD_ISSET(client_sockets[0], &readfds)){
-            int bytes_read = recv(client_sockets[0], buffer, sizeof(buffer), 0);
+        /*
+        проверяем есть ли данные для чтения от первого слиента (client_sockets[0])
 
-            if(bytes_read > 0){
-                buffer[bytes_read] = '\0';
+        это обработка входящего сообщения от 1 лиента на сервере - ретрансляторе 
+        сервер получает зашифрованные данные от одного клиента и пересылает их другому клиенту без расшифровки
+        сервер не знает содержимого сообщения, он просто ретранслирует шифротекст
+        */
+            //чтение длины сообщения
+            uint32_t len_net;
+            int bytes = recv(client_sockets[0], &len_net, 4, 0);
+            /*
+            читаем первые 4 байта - это длина защифрованного сообщения в сетевом порядке (big-endian)
 
-                printf("\033[90mClient 1: %s\033[0m", buffer);
+            len_net - переменная для хранения длины
+            bytes - количество прочитанных байт (должно быть 4)
+            */
+         
 
-                send(client_sockets[1], buffer, bytes_read, 0);
+            if(bytes <= 0) {
+                printf("\033[90mclie 1 disconnect\033[0m\n");
+                continue;
             }
+            /*
+            если прочитано 0 байл - клиент отлючился
+            если прочитанно меньше 0 байт - ошибка чтения
+            выходим из обработки и ждем следующего события
+            */
+
+            size_t data_len = ntohl(len_net);
+            /*
+            ntonl() - преобразует длину из сетевого порядка (big-endian) в порядок хоста (little-endian на x86)
+            теперь data_len - это реальная длина зашифрованных данных
+            */
+
+            // преобразование длинны
+            if(data_len > BUFFER_SIZE){
+                data_len = BUFFER_SIZE;
+            }
+            /*
+            защита от переполнения:
+                если длина больше буфера - образать
+            */
+
+            // чтнение зашифрованных данных
+            u8 encrypted[BUFFER_SIZE];
+            recv(client_sockets[0], encrypted, data_len, 0);
+            /*
+            читаем data_len байт зашифрованных данных в массив encrypted
+            */
+
+            // пересылка второму клиенту (длина + данные)
+            send(client_sockets[1], &len_net, 4, 0);
+            send(client_sockets[1], encrypted, data_len, 0);
+            /*
+            отправляем длину (4 байта) второму клиенту
+            отправляем сами данные второму клиенту
+
+            Сервер не расшифровывает данные - он просто ретранслирует шифротекст
+            */
         }
         /*
         проверка - пришли ла данные от первого клиента
         */
 
         if(FD_ISSET(client_sockets[1], &readfds)){
-            int bytes_read = recv(client_sockets[1], buffer, sizeof(buffer), 0);
+        /*
+        проверяем есть ли данные для чтения от второго слиента (client_sockets[1])
 
-            if(bytes_read > 0){
-                buffer[bytes_read] = '\0';
+        это обработка входящего сообщения от клиента 2 на сервере - ретрансляторе
+        сервер получает зашифрованные данные от второго клиента и пересылает их первому - заркально по сравнению с клиентом 1
+        */
 
-                printf("\033[90mClient 2: %s\033[0m", buffer);
-                send(client_sockets[0], buffer, bytes_read, 0);
+            // чтение длины сообщения
+            uint32_t len_net;
+            int bytes = recv(client_sockets[1], &len_net, 4, 0);
+            /*
+            читаем первые 4 байта - длинузашифрованного сообщения в сетевом порядке (big-endian)
+            len_net - переменная для хранения длины
+            bytes - количество прочитанных байт (должно быть 4)
+            */
+
+            if(bytes <= 0) {
+                printf("\033[90mclie 2 disconnect\033[0m\n");
+                continue;
             }
+            /*
+            если bytes <= 0 - клиент отключился или ошибка чтения
+            выводим сообщение и выходим из обработчика, ждем следующего события
+            */
+
+            // преобразование длины
+            size_t data_len = ntohl(len_net);
+            /*
+            ntohl() — преобразует длину из сетевого порядка (big-endian) в порядок хоста
+            */
+
+            if(data_len > BUFFER_SIZE){
+                data_len = BUFFER_SIZE;
+            }
+            /*
+            защита от переполнения: обрезаем до размера буфера, если длина больше BUFFER_SIZE
+            */
+
+            // чтение зашифрованных данных
+            u8 encrypted[BUFFER_SIZE];
+            recv(client_sockets[1], encrypted, data_len, 0);
+            /*
+            читаем data_len , зашифрованных байт в массив encrypted
+            */
+
+            // пересылка первому клиенту (длина + данные)
+            send(client_sockets[0], &len_net, 4, 0);
+            send(client_sockets[0], encrypted, data_len, 0);
+            /*
+            отправляем длину (4 байта) второму клиенту
+            отправляем сами данные второму клиенту
+            */
         }
         /*
         проверка - пришли ла данные от второго клиента
+
+        Получает от клиента 2 зашифрованное сообщение:
+            читает длину (4 байта)
+            проверяет что клиент не отключился
+            преобразует длине из сетевого порядка
+            читает зашифрованные данные
+            пересылает их клиенту 1
         */
     }
 
     close(server_fd);
-    close(new_socket);
     /*
     закрываем соединение
     */

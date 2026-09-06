@@ -425,10 +425,72 @@ for(int i = 8; i >= 0; i--){ R_inv(plain, round_keys[i]); } - 9 обратных
 */
 
 void encrypt_message(const char *msg, u8 *encrypted, size_t *enc_len){
+    size_t msg_len = strlen(msg);
+    u8 padded[1024];
+    size_t padded_len = msg_len;
 
+    memcpy(padded, msg, msg_len);
+
+    size_t pad_len = 16 - (msg_len % 16);
+
+    if(pad_len == 16){
+        pad_len = 0;
+    }
+
+    if(pad_len > 0){
+        memset(padded + msg_len, pad_len, pad_len);
+        padded_len = msg_len + pad_len;
+    }
+
+    *enc_len = padded_len;
+
+    for(size_t i = 0; i < padded_len; i += 16){
+        kuznechik_encrypt(padded + i, encrypted + i);
+    }
 }
 /*
+    Это функция обертка, которая шифрует сообщение произвольной длины (не только 16 байт) с помощью алгоритма Кузнечик.
+    Она принимает:
+        const char *msg                         исходное текстовое сообщение (строка)
+        u8 *encrypted                           указатель на буфер для зашифрованных данных
+        size_t *enc_len                         сюда запишеться длина зашифрованых данных
 
+    size_t msg_len = strlen(msg);               вычисляем длину исходного сообщения
+    u8 padded[1024];                            создаем временный буфер для хранения сообщения с добавлением паддинга (максимум 1024 байта)
+    size_t padded_len = msg_len;                padded_len - пока равна длине исходного сообщения
+
+    memcpy(padded, msg, msg_len);               копируем исходное сообщение в буфер padded
+
+    size_t pad_len = 16 - (msg_len % 16);       вычисляем сколько байт нужно добавить до кратности 16
+    if(pad_len == 16){ pad_len = 0; }           если msg_len уже кратна 16, то pad_len = 0 (не нужно добавлять)
+
+    if(pad_len > 0)                             если нужно дополнение
+    memset(padded + msg_len, pad_len, pad_len); заполняем pad_len байт значением pad_len
+    padded_len = msg_len + pad_len;             обновляем padded_len (новая длина после дополнения)
+
+    пример для сообщения длинной 15 байт:
+        Исходное сообщение: "Hello World!!!" (15 байт)
+        pad_len = 1
+        Дополняем: добавляем 1 байт со значением 0x01
+        Результат: 16 байт: "Hello World!!!" + 0x01
+
+    пример для сообщения длинной 17 байт:
+        Исходное сообщение: 17 байт
+        pad_len = 15
+        Дополняем: добавляем 15 байт со значением 0x0F
+        Результат: 32 байта
+
+    *enc_len = padded_len;                       сохраняем длину зашифрованных данных в *enc_len
+    
+    for(size_t i = 0; i < padded_len; i += 16){ kuznechik_encrypt(padded + i, encrypted + i); }
+        проходим по всем 16-байтовым блокам:
+            шифруем блок и записываем рузультат в буфер encrypted
+
+    в итоге:
+        encrypt_message() копирует сообщение в буфер
+        дополняет до кратности 16 байтам 
+        шифрует каждый блок через kuznechik_encrypt()
+        возвращает зашифрованные данные и их длину
 */
 
 void decrypt_message(const u8 *encrypted, size_t enc_len, char *decrypted){
