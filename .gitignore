@@ -3,3 +3,6 @@ serv
 *.o
 *.out
 .DS_Store
+gen_tables
+test_Pi
+test_kuz
