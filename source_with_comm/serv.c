@@ -89,12 +89,6 @@ int main(void){
     for(int i = 0; i < MAX_CLIENTS; i++){
         client_sockets[i] = accept(server_fd, (struct sockaddr*)&address, (socklen_t*)&addren);
         printf("\033[90mclie %d connect\033[0m\n", i+1);
-
-        char welcome[] = "welcome to encrypted chat!";
-        uint32_t len_net = htonl(strlen(welcome));
-        
-        send(client_sockets[i], &len_net, 4, 0);
-        send(client_sockets[i], welcome, strlen(welcome), 0);
     }
     /*
     прием двух клиентов
@@ -109,6 +103,24 @@ int main(void){
         FD_SET(client_sockets[1], &readfds);            // добавить сокет второго клиента
         
         int max_fd = (client_sockets[0] > client_sockets[1]) ? client_sockets[0] : client_sockets[1];
+
+        if(client_sockets[0] != -1){
+            FD_SET(client_sockets[0], &readfds);
+
+            if(client_sockets[0] > max_fd){
+                max_fd = client_sockets[0];
+            }
+        }
+        if(client_sockets[1] != -1){
+            FD_SET(client_sockets[1], &readfds);
+
+            if(client_sockets[1] > max_fd) {
+                max_fd = client_sockets[1];
+            }
+        }
+        
+        if(max_fd == -1) break;
+
         select(max_fd + 1, &readfds, NULL, NULL, NULL);
         /*
         определение максимального fd нужно для select
@@ -136,12 +148,12 @@ int main(void){
 
             if(bytes <= 0) {
                 printf("\033[90mclie 1 disconnect\033[0m\n");
-                continue;
+                break;
             }
             /*
             если прочитано 0 байл - клиент отлючился
             если прочитанно меньше 0 байт - ошибка чтения
-            выходим из обработки и ждем следующего события
+            выходим из обработки
             */
 
             size_t data_len = ntohl(len_net);
@@ -199,7 +211,7 @@ int main(void){
 
             if(bytes <= 0) {
                 printf("\033[90mclie 2 disconnect\033[0m\n");
-                continue;
+                break;
             }
             /*
             если bytes <= 0 - клиент отключился или ошибка чтения
