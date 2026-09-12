@@ -23,6 +23,11 @@ gcc -o clie clie.c -lm
 gcc -o serv serv.c -lm
 ```
 
+## Or Compilation via Makefile:
+```bash
+make
+```
+
 ## Launch:
 ```bash
 ./serv    # Terminal 1
