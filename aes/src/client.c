@@ -198,7 +198,7 @@ if(i % 16 == 0)
 
 static void add_round_key(u8 *s, int r){
     for(int i = 0; i < 16; i++){
-        s[i] ^= round_keys[r * 16 + i]
+        s[i] ^= round_keys[r * 16 + i];
     }
 }
 /*
