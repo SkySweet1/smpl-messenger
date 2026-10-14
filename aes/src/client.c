@@ -108,16 +108,170 @@ x >> 7
 */
 
 static u8 gmul(u8 a, u8 b){
+    u8 p = 0;
+
+    for(int i = 0; i < 8; i++){
+        if(b & 1){
+            p ^= a;
+        }
+
+        u8 hi = a & 0x80;
+
+        a<<=1;
+
+        if(hi){
+            a ^= 0x1b;
+        }
+
+        b >>= 1;
+    }
+
+    return p;
+}
+/*
+Функция умножения двух байтов в поле Галуа GF(2^8)
+
+чтобы умножить нужно сделать сдвиг влево
+если старший бит не 0 а 1 то делаеться не просто сдвиг с потерей
+а XOR с 0x1bб ничего не теряя
+
+*/
+
+void aes_init(const u8 *key){
+    memcpy(round_keys, key, 16);
+
+    for(int i = 16; i < 176; i += 4){
+        u8 t[4];
+
+        memcpy(t, round_keys + i - 4, 4);
+
+        if(i % 16 == 0){
+            u8 tmp = t[0];
+
+            t[0] = sbox[t[1]] ^ Rcon[i / 16];
+            t[1] = sbox[t[2]];
+            t[2] = sbox[t[3]];
+            t[3] = sbox[tmp];
+        }
+
+        for(int j = 0; j < 4; j++){
+            round_keys[i + j] = round_keys[i - 16 + j] ^ t[j];
+        }
+    }
+}
+/*
+aes_init() - это развертка (key expansion)
+из 16-байтового ключа AES-128 генерирует 176 байт раундовых ключей (11 ключей <-> 16 байт)
+
+всего нужно 44 слова (44 * 4 = 176 байт)
+каждое новое слово w[i] вычисляеться из предыдущего w[i - 1] и слова w[i - 4]
+    w[i] = w[i - 4] XOR w[i - 1]
+
+но каждое 4-е слово w[4] w[8] w[12] ...
+проходит через специальное преобразование чтобы ключи не повторялись
+
+memcpy() 
+    копируем первые 16 байт мастер-ключа в начало масива round_keys - это 4 начальных слова - w[0] w[1] w[2] w[3]
+
+for(int i = 16; i < 176; i += 4)
+    идем по массиву шагами по 4 байта (по одному слову)
+    начинаем с байта 16
+
+    на каждой итерации мы вычисляем новое слово из 4-х байт
+
+u8 t[4]
+memcpy(t, round_keys + i - 4, 4)
+    берем предыдущее слово w[i - 1] в буфер t
+
+    round_keys + i - 4 -> указатель на предыдущее слово (4 байта назад)
+
+if(i % 16 == 0)
+    проверяем - это четвертое слово?
+
+    если i % 16 == 0
+        то слово начинает новый раунд и его нужно специально преобразовать
+
+    иначе - просто xor с предыдущим словом раунда назад
+
+а дальше просто преобразовагние слова - три операции в одной
+*/
+
+static void add_round_key(){
 
 }
+/*
+Делает xor с раундовым ключом (16 байт)
+*/
+
+static void sub_bytes(){
+
+}
+/*
+заменяет каждый байт состояния по таблице s-box
+*/
+
+static void inv_sub_bytes(){
+
+}
+/*
+заменяет каждый байт состояния по обратной таблице inv-s-box
+*/
+
+static void shift_rows(){
+
+}
+/*
+циклически сдвигает строки матрицы 4x4 влево, перемешивая байты между столбцами
+*/
+
+static void inv_shift_rows(){
+
+}
+/*
+циклически сдвигает строки матрицы 4x4 вправо, отменяя shift_rows
+*/
+
+static void mix_columns(){
+
+}
+/*
+умножает каждый столбец на фиксированную матрицу в gf(2^8), перемешивая байты внутри столбца
+*/
+
+static void inv_mix_columns(){
+
+}
+/*
+умножает каждый столбец на обратную матрицу в gf(2^8), отменяя mix_colomns
+*/
+
+aes_encrypt_block(){
+
+}
+/*
+шифрует один блок - выполняет начальный add_round_key(), затем 9 полных раундов (sub_bytes() -> shift_rows() -> mix_columns() -> add_round_key()) и финальный 10-й раунд без mix_columns()
+*/
+
+aes_decrypt_block(){
+
+}
+/*
+расшифровывает один блок, выполняя те же операции в обратном порядке с обратными функциями (inv_shift_rows() -> inv_sub_bytes() -> inv_mix_columns()) и ключами от последнемо к первому
+*/
 
 void aes_encrypt_message(){
 
 }
+/*
+шифрует сообщение любой длинны, дополняя до 16 байт по PKCS#7 и шифрует каждый блок через aes_encrypt_block()
+*/
 
 void aes_decrypt_message(){
     
 }
+/*
+расшифровывает сообщение - каждый блок через aes_decrypt_block() и убирает PKCS#7 дополнение
+*/
 
 void set_rgb_color(int r, int g, int b){
     printf("\033[38;2;%d;%d;%dm", r, g, b);
@@ -142,6 +296,13 @@ void rainbow_text_smooth(const char *text){
 }
 
 int main(void){
+    u8 key[16] = {
+        0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07,
+        0x08,0x09,0x0A,0x0B,0x0C,0x0D,0x0E,0x0F
+    };
+
+    aes_init(key);
+
     int client_fd;
     struct sockaddr_in server_addr;
     char buffer[BUFFER_SIZE] = {0};
@@ -181,7 +342,7 @@ int main(void){
             u8 encrypted[BUFFER_SIZE];
             size_t enc_len;
 
-            aes_encrypt_message();
+            aes_encrypt_message(buffer, encrypted, &enc_len);
 
             uint32_t len_net = htonl(enc_len);
             send(client_fd, &len_net, 4, 0);
@@ -212,7 +373,7 @@ int main(void){
 
             char decrypted[BUFFER_SIZE];
 
-            aes_decrypt_message();
+            aes_decrypt_message(encrypted, enc_len, decrypted);
 
             rainbow_text_smooth(decrypted);
             printf("\n");
