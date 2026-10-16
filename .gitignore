@@ -1,6 +1,8 @@
 clie
 serv
 data
+client
+server
 *.o
 *.out
 .DS_Store

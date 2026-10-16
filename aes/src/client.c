@@ -608,7 +608,7 @@ void aes_decrypt_block(const u8 *cipher, u8 *plain){
 
 void aes_encrypt_message(const char *msg, u8 *encrypted, size_t *enc_len){
     size_t msg_len = strlen(msg);                   // длина исходного сообщения
-    u8 padded[1024];                                // временный буфер для сообщения с PKCS#7 дополнением
+    u8 padded[1040];                                // временный буфер для сообщения с PKCS#7 дополнением -> пофикшено: теперь 1040 байт, чтобы вместить 1024 байта сообщения + 16 байт дополнения
     memcpy(padded, msg, msg_len);
 
         
@@ -630,7 +630,7 @@ aes шифрует только один блок 16 байт, а эта фун�
 
 копирование сообщения в буффер
     size_t msg_len = strlen(msg)        длинна строки без нуль-терминатора
-    u8 padded[1024];                    временный буфер (макс 1024)
+    u8 padded[1040];                    временный буфер (макс 1040)             -> пофикшено: теперь 1040 байт, чтобы вместить 1024 байта сообщения + 16 байт дополнения
     memcpy(padded, msg, msg_len);       копирование сообщения в padded чтобы дальше работать с ним не трогая оригинал
 
 вычисление длинны дополнения (PKCS#7)
@@ -651,7 +651,12 @@ aes шифрует только один блок 16 байт, а эта фун�
 */
 
 void aes_decrypt_message(const u8 *encrypted, size_t enc_len, char *msg){
-    u8 decrypted[1024];
+    u8 decrypted[1040];                                         // пофикшено: теперь без переполения
+
+    if (enc_len == 0 || enc_len % 16 != 0){
+        msg[0] = '\0';                                         // если длина не кратна 16, то сообщение повреждено
+        return;
+    }
 
     for(size_t i = 0; i < enc_len; i += 16){                    // расшифрование всех блоков
         aes_decrypt_block(encrypted + i, decrypted + i);
@@ -671,11 +676,16 @@ void aes_decrypt_message(const u8 *encrypted, size_t enc_len, char *msg){
 /*
 расшифровывает сообщение - каждый блок через aes_decrypt_block() и убирает PKCS#7 дополнение
 
+проверка
+    if (enc_len == 0 || enc_len % 16 != 0){ msg[0] = '\0'; return; }
+
+    добавленна проверка - если данные повреждены или пусты то возвращаем пустую строку
+
 локальный буфер
-    u8 decrypted[1024];
+    u8 decrypted[1040];                                         // пофикшено: теперь без переполения
 
     временное хранилице для расшифрованных данных
-    маскимум 1024 байта (так как в padded при расшифровании)
+    маскимум 1040 байта (так как в padded при расшифровании)
 
 расшифрование по блокам
     for(size_t i = 0; i < enc_len; i += 16){ aes_decrypt_block(encrypted + i, decrypted + i); }
@@ -714,6 +724,13 @@ void set_rgb_color(int r, int g, int b){
 
 void rainbow_text_smooth(const char *text){
     int length = strlen(text);
+
+    if(length == 0){
+        return;
+    }
+    // добавленно: 
+    //     добалвенна проверка на пустую строку, чтобы избежать деления на ноль при вычислении p = (float)i / length
+    //     если длина строки равна нулю, то функция просто возвращает управление без вывода текста 
 
     for(int i = 0; i < length; i++){
         float p = (float)i / length;
@@ -779,7 +796,14 @@ int main(void){
 
             aes_encrypt_message(buffer, encrypted, &enc_len);
 
-            uint32_t len_net = htonl(enc_len);
+            uint32_t len_net = htonl((uint32_t)enc_len);
+            /*
+            htonl((uint32_t)enc_len)
+            
+            enc_len имеет тип size_t (8 байт на 64-bit системах), 
+            а htonl ожидает uint32_t (4 байта). явное приведение убирает warning компилятора и делает намерение понятным
+            */
+
             send(client_fd, &len_net, 4, 0);
             send(client_fd, encrypted, enc_len, 0);
         }
