@@ -606,18 +606,106 @@ void aes_decrypt_block(const u8 *cipher, u8 *plain){
 без этой функции шифротекст остался бы нечитаемым и расшифрование было бы невозможным, так как не было бы обратного преобразования для каждого раунда шифрования
 */
 
-void aes_encrypt_message(){
+void aes_encrypt_message(const char *msg, u8 *encrypted, size_t *enc_len){
+    size_t msg_len = strlen(msg);                   // длина исходного сообщения
+    u8 padded[1024];                                // временный буфер для сообщения с PKCS#7 дополнением
+    memcpy(padded, msg, msg_len);
+
+        
+    size_t pad_len = 16 - (msg_len % 16);           // длина дополнения по PKCS#7
+
+    memset(padded + msg_len, pad_len, pad_len);     // добавляем дополнение в конец сообщения
+    *enc_len = msg_len + pad_len;                   // итоговая длина зашифрованного сообщения (кратна 16)
+
+    for(size_t i = 0; i < *enc_len; i += 16){
+        aes_encrypt_block(padded + i, encrypted + i);
+    }
 
 }
 /*
 шифрует сообщение любой длинны, дополняя до 16 байт по PKCS#7 и шифрует каждый блок через aes_encrypt_block()
+
+обертка над aes_encrypt_block() 
+aes шифрует только один блок 16 байт, а эта функция умеет шифровать сообщение произвольно длинны - дополныет его и разбивает на блоки по 16 байт
+
+копирование сообщения в буффер
+    size_t msg_len = strlen(msg)        длинна строки без нуль-терминатора
+    u8 padded[1024];                    временный буфер (макс 1024)
+    memcpy(padded, msg, msg_len);       копирование сообщения в padded чтобы дальше работать с ним не трогая оригинал
+
+вычисление длинны дополнения (PKCS#7)
+    size_t pad_len = 16 - (msg_len % 16);   сколько байт нехвататет дло кратности 16
+
+добавление дополнения
+    memset(padded + msg_len, pad_len, pad_len);     добавляем дополнение в конец сообщения
+        каждый байт дополнения содержит число байт дополнения
+        например если нужно добавить 5 байт то добавляем 0x05 0x05 0x05 0x05 0x05
+    *enc_len -> итоговая длинна защифрованного сообщения (кратна 16)
+
+поблочная шифровка
+    for(size_t i = 0; i < *enc_len; i += 16){ aes_encrypt_block(padded + i, encrypted + i); } 
+
+    идем по padded шагами по 16 байт
+    каждый блок шифруем через aes_encrypt_block()
+    результат пишем в encrypted со смещением i
 */
 
-void aes_decrypt_message(){
-    
+void aes_decrypt_message(const u8 *encrypted, size_t enc_len, char *msg){
+    u8 decrypted[1024];
+
+    for(size_t i = 0; i < enc_len; i += 16){                    // расшифрование всех блоков
+        aes_decrypt_block(encrypted + i, decrypted + i);
+    }
+
+    size_t pad_len = decrypted[enc_len - 1];                    // последний байт = длина PKCS#7 дополнения
+
+    if(pad_len >= 1 && pad_len <= 16 && pad_len <= enc_len){
+        memcpy(msg, decrypted, enc_len - pad_len);
+        msg[enc_len - pad_len] = '\0';
+
+    } else {
+        memcpy(msg, decrypted, enc_len);
+        msg[enc_len] = '\0';
+    }
 }
 /*
 расшифровывает сообщение - каждый блок через aes_decrypt_block() и убирает PKCS#7 дополнение
+
+локальный буфер
+    u8 decrypted[1024];
+
+    временное хранилице для расшифрованных данных
+    маскимум 1024 байта (так как в padded при расшифровании)
+
+расшифрование по блокам
+    for(size_t i = 0; i < enc_len; i += 16){ aes_decrypt_block(encrypted + i, decrypted + i); }
+
+    идем по encrypted шагами по 16 байт
+    каждый блок расшифровываем через aes_decrypt_block()
+    результат пишем в decrypted со смещением i
+
+    шифрование ттоже шло по блокам 16 байт с теми же смещениями поэтому порядок сохраняеться
+
+читаем длинну дополнения
+    size_t pad_len = decrypted[enc_len - 1];
+
+    по стандарту PKCS#7 последний байт расшифрованного сообщения содержит длинну дополнения
+    последний байт расшифрованного сообщения содержит длинну PKCS#7 дополнения
+    например если дополнение было 0x05 0x05 0x05 0x05 0x05 то последний байт = 0x05
+
+убираем дополнение р копируем в msg
+    if(pad_len >= 1 && pad_len <= 16 && pad_len <= enc_len){
+        memcpy(msg, decrypted, enc_len - pad_len);
+        msg[enc_len - pad_len] = '\0';
+
+    } else {
+        memcpy(msg, decrypted, enc_len);
+        msg[enc_len] = '\0';
+    }
+
+    если дополнение корректное (от 1 до 16 и не больше длины сообщения) то копируем только полезные данные без дополнения
+    иначе копируем все расшифрованные данные (возможно поврежденные) и добавляем нуль-терминатор
+
 */
 
 void set_rgb_color(int r, int g, int b){
