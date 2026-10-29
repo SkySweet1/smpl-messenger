@@ -9,3 +9,7 @@ server
 gen_tables
 test_Pi
 test_kuz
+build/
+cmake-build-*/
+.vscode/
+.idea/
