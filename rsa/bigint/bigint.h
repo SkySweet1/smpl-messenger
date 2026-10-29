@@ -43,5 +43,6 @@ void bigint_shl(bigint_t *number, int bits);
 void bigint_shr(bigint_t *number, int bits);
 
 int bigint_get_bit(const bigint_t *number, int bit);
+void bigint_print_hex(const bigint_t *number);
 
 #endif
