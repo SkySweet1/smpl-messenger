@@ -40,20 +40,85 @@ length - показвает сколько слов реально исполь�
 */
 
 void bigint_from_int(bigint_t *number, uint64_t value){
+    bigint_init(number);
 
+    number->limbs[0] = (uint32_t)(value & 0xFFFFFFFF);
+    number->limbs[1] = (uint32_t)(value >> 32);
+    number->length = (number->limbs[1] != 0) ? 2 : (number->limbs[0] != 0 ? 1 : 0);   
 }
+/*
+функция первода обычного 64-битного числа в формат bigint
+она нужна для того чтобы загружать в систему bigint маленькие числа
+
+число value = 0x1122334455667788 (это 64 бита).
+
+bigint_init(number)
+сначала очищаем структуру, чтобы в ней не было мусора.
+Разбиваем 64 бита на два 32-битных куска:
+    value & 0xFFFFFFFF оставляет только младшие 32 бита.
+    0x1122334455667788 & 0xFFFFFFFF = 0x55667788. Это ложится в limbs[0].
+
+    value >> 32 сдвигает число вправо на 32 бита, отбрасывая младшую половину.
+    0x1122334455667788 >> 32 = 0x11223344. Это ложится в limbs[1].
+
+Определяем длину (length):
+    использовал тернарный оператор ? ::
+        Если старшее слово (limbs[1]) не равно нулю — значит, число занимает 2 слова (length = 2).
+        Иначе (если limbs[1] == 0) — проверяем младшее слово. Если оно не ноль — число занимает 1 слово (length = 1).
+        Если оба слова нули — число равно 0 (length = 0).
+*/
 
 void bigint_copy(bigint_t *dest, const bigint_t *src){
+    memcpy(dest->limbs, src->limbs, sizeof(src->limbs));
 
+    dest->length = src->length;
 }
+/*
+копирует одно огромное число src в другое dest на уровне процессора
 
-void bigint_print_hex(const bigint_t *number){
+в bigint нельзя просто написать a = b поскольку это скопирует только указатели или выдаст ошибку
+чтобы перенести значение из одной переменно в другую надо использовать bigint_copy
+*/
 
+int bigint_cmp(const bigint_t *number_A, const bigint_t *number_B){
+    if(number_A->length > number_B->length){
+        return 1;
+    }
+
+    if(number_A->length < number_B->length){
+        return -1;
+    }
+
+    for(int i = number_A->length - 1; i >= 0; i--){
+        if(number_A->limbs[i] > number_B->limbs[i]){
+            return 1;
+        }
+
+        if(number_A->limbs[i] < number_B->limbs[i]){
+            return -1;
+        }
+    }
+
+    return 0;
 }
+/*
+сравнивает два числа и говорит кто из них больше
+    возвращает 
+        1   если A > B
+        -1  если A < B
+        0   если равны
 
-int bigint_cmp(const bigint_t *number_A, const bigint_t *number_b){
+    if(number_A->length > number_B->length) return 1;
+    if(number_A->length < number_B->length) return -1;
+        если одно число занимает три ячейки в другое 2 - то перво точно больше и дальше не смотрим на сами цифры
+        это оптимизация
 
-}
+    for(int i = number_A->length - 1; i >= 0; i--){
+        если длины равно то начинаеться сравнение их с самого старшего разряда (справа налево по массиву то есть от length -1 до 0)
+
+        внутри цикла находим первое несовпадение и сразу же возвращаем победителя
+        если цикл дошел до конца и ничего не найдено - значит числа абсолютно одинаковые и возвращаеться 0
+*/
 
 int bigint_is_zero(const bigint_t *number){
     return number->length == 0;
