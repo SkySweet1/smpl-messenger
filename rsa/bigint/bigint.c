@@ -190,7 +190,7 @@ void bigint_add(bigint_t *result, const bigint_t *number_A, const bigint_t *numb
 }
 /*
 функция сложения
-идет слева направо (от младших слов к старшим), складываем соответствующие слова и 
+идет слева направо (от младших слов к старшим), складываем соответствующие слова и
 переносим еденицу в следующий разряд если сумма превысила 32 бита
 
 функция складывает два больших числа и записывает результат в result
@@ -239,22 +239,28 @@ void bigint_sub(bigint_t *result, const bigint_t *number_A, const bigint_t *numb
     bigint_init(result);
     int64_t borrow = 0;
 
-    for (int i = 0; i < number_A->length; i++) {
+    for (int i = 0; i < number_A->length; i++)
+    {
         int64_t diff = (int64_t)number_A->limbs[i] - borrow;
-        if (i < number_B->length) diff -= number_B->limbs[i];
-        
-        if (diff < 0) {
+        if (i < number_B->length)
+            diff -= number_B->limbs[i];
+
+        if (diff < 0)
+        {
             diff += 0x100000000LL;
             borrow = 1;
-        } else {
+        }
+        else
+        {
             borrow = 0;
         }
         result->limbs[i] = (uint32_t)diff;
     }
-    
+
     result->length = number_A->length;
 
-    while (result->length > 0 && result->limbs[result->length - 1] == 0) {
+    while (result->length > 0 && result->limbs[result->length - 1] == 0)
+    {
         result->length--;
     }
 }
@@ -262,7 +268,7 @@ void bigint_sub(bigint_t *result, const bigint_t *number_A, const bigint_t *numb
 функция вычитает число B из числа A (result = A - B)
 работает по принципу вычитания в столбик с заемом (borrow)
 
-важно: эта функция считает, что A >= B. 
+важно: эта функция считает, что A >= B.
 структура не поддерживает отрицательные числа, поэтому если A < B, результат будет мусором.
 в RSA нужно смотреть за тем, чтобы вычитаемое не было больше уменьшаемого (например, при взятии по модулю).
 
@@ -283,14 +289,14 @@ if (diff < 0) {
     если результат отрицательный, значит, нам не хватило значения в этом разряде
     мы "занимаем" 1 у следующего старшего разряда
     в 32-битной арифметике "занять 1" означает прибавить 2^32 (то есть 0x100000000)
-   
+
 например: 5 - 10 = -5
     -5 + 4294967296 (0x100000000) = 4294967291, что в hex равно 0xFFFFFFFB
     именно это значение и должно быть записано в 32-битный лимб
     компилятор сам сделает это преобразование, потому что diff у нас int64_t
 
 result->limbs[i] = (uint32_t)diff;
-    записываем корректное 32-битное значение в результат. 
+    записываем корректное 32-битное значение в результат.
     старшие биты просто отсекутся при приведении типа.
 
 result->length = number_A->length;
@@ -300,22 +306,167 @@ while (result->length > 0 && result->limbs[result->length - 1] == 0) {
     result->length--;
 }
     обрезка ведущих нулей (trimming) - критически важная часть
-    
-в RSA вычитание нужно для алгоритма Евклида (нахождение НОД), для модульного вычитания 
+
+в RSA вычитание нужно для алгоритма Евклида (нахождение НОД), для модульного вычитания
 и для проверки условий. правильная обрезка нулей в конце делает эту функцию безопасной для всех криптографических циклов.
 */
 
 void bigint_mul(bigint_t *result, const bigint_t *number_A, const bigint_t *number_B)
 {
+    bigint_init(result);
+    if (number_A->length == 0 || number_B->length == 0)
+        return;
+
+    uint32_t temp[BIGINT_LIMBS * 2] = {0}; // массив для результата (временный)
+
+    for (int i = 0; i < number_A->length; i++)
+    {
+        uint64_t carry = 0;
+
+        for (int j = 0; j < number_B->length; j++)
+        {
+            uint64_t prod = (uint64_t)number_A->limbs[i] * number_B->limbs[j] + temp[i + j] + carry;
+            // a[i] * b[j] + temp[i+j] + carry
+
+            temp[i + j] = (uint32_t)(prod & 0xFFFFFFFF);
+            carry = prod >> 32;
+        }
+
+        temp[i + number_B->length] += (uint32_t)carry;
+    }
+
+    memcpy(result->limbs, temp, sizeof(temp));
+
+    result->length = number_A->length + number_B->length;
+
+    while (result->length > 0 && result->limbs[result->length - 1] == 0)
+    {
+        result->length--;
+    }
 }
+/*
+умножение в столбик
+
+функция умножает два огромных числа используя алгорит в столбик
+
+создаеться временный массив temp размером в два раза больше максимальной длины и инициализируеться нулями
+
+внешний цикл перебирает все 32-х битные слова первого числа А
+    внутренний цикл перебирает все слова второго числа B
+
+после внтреннего цикла остаток переноса записываеться в следующию ячейку
+ну и готовый массив копируеться в result 
+длинна устанавливаеться как сумма длин А и В затем цикл while сьедет ведущие нули чтобы длина числа была реальной
+*/
 
 void bigint_shl(bigint_t *number, int bits)
 {
+    if (number->length == 0 || bits == 0)
+    {
+        return;
+    }
+
+    int words = bits / 32;
+    int shift = bits % 32;
+
+    if (shift == 0)
+    {
+        for (int i = number->length - 1; i >= 0; i--)
+        {
+            number->limbs[i + words] = number->limbs[i];
+        }
+    }
+    else
+    {
+        for (int i = number->length - 1; i >= 0; i--)
+        {
+            number->limbs[i + words + 1] |= (number->limbs[i] >> (32 - shift));
+            number->limbs[i + words] = (number->limbs[i] << shift);
+        }
+    }
+
+    number->length += words + 1;
+
+    while (number->length > 0 && number->limbs[number->length - 1] == 0)
+    {
+        number->length--;
+    }
 }
+/*
+функция сдвигает все биты числа влево (эквивалентно умножению на 2^bits)
+
+она делитсдвиг влево на две части
+    сдвиг целых 32-х битных слов (words) и побитовый сдвиг внутри слова shift
+
+если shift == 0 то сдвигаем только целые слова
+    это происходит с конца массива чтобы случайно не затереть данные которые еще не перенесли
+
+если shift > 0 идем с конца и делаем две вещи
+    сдвигаем влево на нужное количество бит (number->limbs[i + words] = (number->limbs[i] << shift);)
+
+    те биты которые вылетели за пределы 32-х битного слова мы перекидываем в следубщее слово (старшее) с помощью |= (это ИЛИ только побитовое)
+    чтото типо переноса в столбик
+
+в итоге длина увеличиваеться на количество сдвинутых слов + 1 а затем удаляються введущие нули
+*/
 
 void bigint_shr(bigint_t *number, int bits)
 {
+    if (number->length == 0 || bits == 0)
+    {
+        return;
+    }
+
+    int words = bits / 32;
+    int shift = bits % 32;
+
+    if (words >= number->length)
+    {
+        bigint_init(number);
+        return;
+    }
+
+    for (int i = 0; i < number->length - words; i++)
+    {
+        number->limbs[i] = number->limbs[i + words];
+    }
+    number->length -= words;
+
+    if (shift > 0)
+    {
+        for (int i = 0; i < number->length; i++)
+        {
+            number->limbs[i] >>= shift;
+            if (i + 1 < number->length)
+            {
+                number->limbs[i] |= (number->limbs[i + 1] << (32 - shift));
+            }
+        }
+    }
+    while (number->length > 0 && number->limbs[number->length - 1] == 0)
+    {
+        number->length--;
+    }
 }
+/*
+сдвиг вправо
+это обратная операция сдвигов вправо 
+
+если мы сдвигаем больше чем длина самого числа то все значащие биты улетят в без понятие куда - функция просто обнуляет число bigint_init
+
+перезаписываем младшие слова старшими 
+слово i заменяеться слово i+words 
+это отбрасывает младшие куски числа
+
+потом нужно сдвинуть каждый оставшийся кусочек вправо
+    number->limbs[i] >>= shift; — сдвигаем слово вправо
+
+    number->limbs[i] |= (number->limbs[i + 1] << (32 - shift)); — а те биты
+    которые отрезались справа, нам не нужны, но нам нужны биты из следующего (более старшего) слова
+    берём его младшие биты и приклеиваем к нашему слову через |=
+
+ну и в итоге так же удаляються ведущие нули чтобы не таскать за собой пустые ячейки
+*/
 
 int bigint_get_bit(const bigint_t *number, int bits)
 {
