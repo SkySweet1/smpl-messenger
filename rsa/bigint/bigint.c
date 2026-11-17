@@ -2,14 +2,15 @@
 #include <stdio.h>
 #include <string.h>
 
-void bigint_init(bigint_t *number){
+void bigint_init(bigint_t *number)
+{
     memset(number->limbs, 0, sizeof(number->limbs));
 
     number->length = 0;
 }
 /*
 функция обнуление числа
-т е в С локальные переменные не обнуляються автоматически, 
+т е в С локальные переменные не обнуляються автоматически,
 перед любыми математическими операциями нужно явно обнулить что-либо
 
 memset(number->limbs, 0, sizeof(number->limbs));
@@ -26,25 +27,26 @@ length - показвает сколько слов реально исполь�
 для нее это может быть число размером в 4096 бит (128 слов), где все старшие цифры - это нули
 установив length = 0, мы как бы подразумевает - "это число ноль и оно занимает 0 ячеек памяти"
 
-в итоге когда мы пишем 
+в итоге когда мы пишем
     bigint_t my_number;
     bigint_init(&my_number);
 
     в памяти создаеться структура в которой все 128 ячеек (limbs) заполненны нулями (0x00000000)
     length = 0;
 
-    и число готово к тому чтобы в него чтото записали 
+    и число готово к тому чтобы в него чтото записали
 
-    а вот без этой функции программа пыталась бы сложить новы bigint 
+    а вот без этой функции программа пыталась бы сложить новы bigint
     с мусорными числами из оперативной памяти и результат был бы непредстазуемым и скорее всего программа упала бы с ошибкой
 */
 
-void bigint_from_int(bigint_t *number, uint64_t value){
+void bigint_from_int(bigint_t *number, uint64_t value)
+{
     bigint_init(number);
 
     number->limbs[0] = (uint32_t)(value & 0xFFFFFFFF);
     number->limbs[1] = (uint32_t)(value >> 32);
-    number->length = (number->limbs[1] != 0) ? 2 : (number->limbs[0] != 0 ? 1 : 0);   
+    number->length = (number->limbs[1] != 0) ? 2 : (number->limbs[0] != 0 ? 1 : 0);
 }
 /*
 функция первода обычного 64-битного числа в формат bigint
@@ -68,7 +70,8 @@ bigint_init(number)
         Если оба слова нули — число равно 0 (length = 0).
 */
 
-void bigint_copy(bigint_t *dest, const bigint_t *src){
+void bigint_copy(bigint_t *dest, const bigint_t *src)
+{
     memcpy(dest->limbs, src->limbs, sizeof(src->limbs));
 
     dest->length = src->length;
@@ -80,21 +83,27 @@ void bigint_copy(bigint_t *dest, const bigint_t *src){
 чтобы перенести значение из одной переменно в другую надо использовать bigint_copy
 */
 
-int bigint_cmp(const bigint_t *number_A, const bigint_t *number_B){
-    if(number_A->length > number_B->length){
+int bigint_cmp(const bigint_t *number_A, const bigint_t *number_B)
+{
+    if (number_A->length > number_B->length)
+    {
         return 1;
     }
 
-    if(number_A->length < number_B->length){
+    if (number_A->length < number_B->length)
+    {
         return -1;
     }
 
-    for(int i = number_A->length - 1; i >= 0; i--){
-        if(number_A->limbs[i] > number_B->limbs[i]){
+    for (int i = number_A->length - 1; i >= 0; i--)
+    {
+        if (number_A->limbs[i] > number_B->limbs[i])
+        {
             return 1;
         }
 
-        if(number_A->limbs[i] < number_B->limbs[i]){
+        if (number_A->limbs[i] < number_B->limbs[i])
+        {
             return -1;
         }
     }
@@ -103,7 +112,7 @@ int bigint_cmp(const bigint_t *number_A, const bigint_t *number_B){
 }
 /*
 сравнивает два числа и говорит кто из них больше
-    возвращает 
+    возвращает
         1   если A > B
         -1  если A < B
         0   если равны
@@ -120,7 +129,8 @@ int bigint_cmp(const bigint_t *number_A, const bigint_t *number_B){
         если цикл дошел до конца и ничего не найдено - значит числа абсолютно одинаковые и возвращаеться 0
 */
 
-int bigint_is_zero(const bigint_t *number){
+int bigint_is_zero(const bigint_t *number)
+{
     return number->length == 0;
 }
 /*
@@ -129,13 +139,13 @@ int bigint_is_zero(const bigint_t *number){
 return number->length == 0;
     number->length - это поле структуры которое зранит сколько 32-х битный слов реально занимает число
 
-    идет проверка - если length равен нулю то выраение number->length == 0 дает истинну (1) 
+    идет проверка - если length равен нулю то выраение number->length == 0 дает истинну (1)
     если больше нуля то выражение дает 0 - ложь
 
-вообще эта функция нужна 
-    для читаемости кода 
+вообще эта функция нужна
+    для читаемости кода
         (ну это понятно почему)
-    для безопасности 
+    для безопасности
         мы можем хранить длинуу в length сейчас
         а после, мы можем хранить ее иначе или добавить отрицательные числа и если мы поменяем внутренне устройство структуры, нам придеться искать по всему коду проверки number->length == 0 и менять их
         а если мы используем вот такую функцию то нужно будет изменить ее одну
@@ -153,31 +163,167 @@ return number->length == 0;
 
 */
 
-void bigint_add(bigint_t *result, const bigint_t *number_A, const bigint_t *number_B){
+void bigint_add(bigint_t *result, const bigint_t *number_A, const bigint_t *number_B)
+{
+    bigint_init(result);
 
+    int max_len = (number_A->length > number_B->length) ? number_A->length : number_B->length;
+
+    uint64_t carry = 0;
+
+    for (int i = 0; i < max_len || carry; i++)
+    {
+        uint64_t sum = carry;
+
+        if (i < number_A->length)
+            sum += number_A->limbs[i];
+
+        if (i < number_B->length)
+            sum += number_B->limbs[i];
+
+        result->limbs[i] = (uint32_t)(sum & 0xFFFFFFFF);
+
+        carry = sum >> 32;
+
+        result->length = i + 1;
+    }
+}
+/*
+функция сложения
+идет слева направо (от младших слов к старшим), складываем соответствующие слова и 
+переносим еденицу в следующий разряд если сумма превысила 32 бита
+
+функция складывает два больших числа и записывает результат в result
+работает по принципу сложения в столбик, но не по десятичным цифрам, а по 32-битным словам
+
+bigint_init(result);
+    сначала обнуляем результат, чтобы там не было мусора из памяти
+
+int max_len
+    находим длину самого длинного числа из двух
+    это нужно чтобы знать, сколько итераций цикла нам точно придется сделать
+    если одно число короче, мы просто будем добавлять к нему нули (пропуская его в if)
+
+uint64_t carry = 0;
+    это самая важная переменная - перенос (carry)
+    максимальная сумма двух 32-битных чисел + перенос = 0xFFFFFFFF + 0xFFFFFFFF + 1 = 0x1FFFFFFF
+    это число не влезает в 32 бита! если бы мы использовали uint32_t, произошло бы переполнение и мы потеряли бы старший бит
+    в 64 битах это число помещается с огромным запасом, поэтому перенос мы просто сдвигаем вправо
+
+or (int i = 0; i < max_len || carry; i++)
+    идем от младших слов к старшим (little-endian)
+    условие || carry - это гениальная защита от переполнения на самом последнем шаге
+
+uint64_t sum = carry;
+    начинаем сумму с переноса с предыдущего шага (на первом шаге он равен 0)
+
+if (i < number_A->length) sum += number_A->limbs[i];
+if (i < number_B->length) sum += number_B->limbs[i];
+    если у числа еще есть слова на этой позиции, добавляем их к сумме
+    если число короче, мы просто пропускаем этот if, что равносильно добавлению нуля
+
+result->limbs[i] = (uint32_t)(sum & 0xFFFFFFFF);
+    в результат записываем только младшие 32 бита суммы
+    маска 0xFFFFFFFF отрезает всё, что выше 32 бит
+
+carry = sum >> 32;                      переносом становятся старшие 32 бита суммы
+
+result->length = i + 1;                 обновляем длину результата на каждой итерации
+
+в RSA сложение используется постоянно: при инкременте счетчиков, в алгоритме Евклида, при редукции Монгомери.
+эта функция работает за O(max_len) и абсолютно надежна за счет 64-битного буфера.
+*/
+
+void bigint_sub(bigint_t *result, const bigint_t *number_A, const bigint_t *number_B)
+{
+    bigint_init(result);
+    int64_t borrow = 0;
+
+    for (int i = 0; i < number_A->length; i++) {
+        int64_t diff = (int64_t)number_A->limbs[i] - borrow;
+        if (i < number_B->length) diff -= number_B->limbs[i];
+        
+        if (diff < 0) {
+            diff += 0x100000000LL;
+            borrow = 1;
+        } else {
+            borrow = 0;
+        }
+        result->limbs[i] = (uint32_t)diff;
+    }
+    
+    result->length = number_A->length;
+
+    while (result->length > 0 && result->limbs[result->length - 1] == 0) {
+        result->length--;
+    }
+}
+/*
+функция вычитает число B из числа A (result = A - B)
+работает по принципу вычитания в столбик с заемом (borrow)
+
+важно: эта функция считает, что A >= B. 
+структура не поддерживает отрицательные числа, поэтому если A < B, результат будет мусором.
+в RSA нужно смотреть за тем, чтобы вычитаемое не было больше уменьшаемого (например, при взятии по модулю).
+
+int64_t borrow = 0;         нужно чтобы ловить отрицательные значения при переполнении вниз
+
+for (int i = 0; i < number_A->length; i++)
+    идем по длине числа А. так как А >= В, длина А всегда больше или равна длине В.
+
+int64_t diff = (int64_t)number_A->limbs[i] - borrow;
+if (i < number_B->length) diff -= number_B->limbs[i];
+    берем слово из А, вычитаем заем с прошлого шага и вычитаем слово из В (если оно есть)
+
+if (diff < 0) {
+    diff += 0x100000000LL;
+    borrow = 1;
+}
+    это эмуляция аппаратного флага заема (borrow flag) из ассемблера
+    если результат отрицательный, значит, нам не хватило значения в этом разряде
+    мы "занимаем" 1 у следующего старшего разряда
+    в 32-битной арифметике "занять 1" означает прибавить 2^32 (то есть 0x100000000)
+   
+например: 5 - 10 = -5
+    -5 + 4294967296 (0x100000000) = 4294967291, что в hex равно 0xFFFFFFFB
+    именно это значение и должно быть записано в 32-битный лимб
+    компилятор сам сделает это преобразование, потому что diff у нас int64_t
+
+result->limbs[i] = (uint32_t)diff;
+    записываем корректное 32-битное значение в результат. 
+    старшие биты просто отсекутся при приведении типа.
+
+result->length = number_A->length;
+    временно считаем, что длина результата равна длине А
+
+while (result->length > 0 && result->limbs[result->length - 1] == 0) {
+    result->length--;
+}
+    обрезка ведущих нулей (trimming) - критически важная часть
+    
+в RSA вычитание нужно для алгоритма Евклида (нахождение НОД), для модульного вычитания 
+и для проверки условий. правильная обрезка нулей в конце делает эту функцию безопасной для всех криптографических циклов.
+*/
+
+void bigint_mul(bigint_t *result, const bigint_t *number_A, const bigint_t *number_B)
+{
 }
 
-void bigint_sub(bigint_t *result, const bigint_t *number_A, const bigint_t *number_B){
-
+void bigint_shl(bigint_t *number, int bits)
+{
 }
 
-void bigint_mul(bigint_t *result, const bigint_t *number_A, const bigint_t *number_B){
-
+void bigint_shr(bigint_t *number, int bits)
+{
 }
 
-void bigint_shl(bigint_t *number, int bits){
-
-}
-
-void bigint_shr(bigint_t *number, int bits){
-
-}
-
-int bigint_get_bit(const bigint_t *number, int bits){
+int bigint_get_bit(const bigint_t *number, int bits)
+{
     int word = bits / 32;
     int position = bits % 32;
 
-    if(word >= number->length){
+    if (word >= number->length)
+    {
         return 0;
     }
 
@@ -204,12 +350,14 @@ return (number->limbs[word] >> position) & 1;
     делаем побитовое и (& 1) чтобы оставить только правый бит и все остальное стереть в ноль
     возвращаем в результат
 
-в RSA в алгоритме возведени в степерь по модулю нужно перебиьрать биты показателя стапени от младшего к старшему 
+в RSA в алгоритме возведени в степерь по модулю нужно перебиьрать биты показателя стапени от младшего к старшему
 эта функция позволяет узнать равна ли текущая позиция еденице или нулю
 */
 
-void bigint_print_hex(const bigint_t *number){
-    if(number->length == 0){
+void bigint_print_hex(const bigint_t *number)
+{
+    if (number->length == 0)
+    {
         printf("0\n");
 
         return;
@@ -217,14 +365,15 @@ void bigint_print_hex(const bigint_t *number){
 
     printf("0x%X", number->limbs[number->length - 1]);
 
-    for(int i = number->length - 2; i >= 0; i--){
+    for (int i = number->length - 2; i >= 0; i--)
+    {
         printf("%08X", number->limbs[i]);
     }
 
     printf("\n");
 }
 /*
-эта функция выводит огромное число bigint на экран в шестнадцатеричном формате 
+эта функция выводит огромное число bigint на экран в шестнадцатеричном формате
 и она нужна для отладки чтобы можно было увидеть глазами и проверить что математические операции типа сложения или умножения работают правильно
 
 if(number->length == 0)                                 если число равно нулю то просто надо напечатать 0
