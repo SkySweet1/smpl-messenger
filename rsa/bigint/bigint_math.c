@@ -42,7 +42,7 @@ void bigint_mod(bigint_t *result, const bigint_t *A, const bigint_t *B)
     bigint_copy(result, &rem);
 }
 /*
-остаток от деления (A (mod B)) - теория Драгунова
+остаток от деления (A (mod B)) - (теория Драгунова)
 
 функция вычисляет сволько останеться если разделить огромное число А на число В
 

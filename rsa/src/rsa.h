@@ -20,4 +20,8 @@ typedef struct
 void rsa_generate_keys(rsa_public_key_t *pub, rsa_private_key_t *priv);
 */
 
+void rsa_encrypt(bigint_t *cipher, const bigint_t *msg, const rsa_public_key_t *pub);
+
+void rsa_decrypt(bigint_t *msg, const bigint_t *cipher, const rsa_private_key_t *priv);
+
 #endif
